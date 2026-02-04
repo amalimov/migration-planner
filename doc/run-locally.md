@@ -67,6 +67,10 @@ Start the Migration Planner API server:
 make run
 ```
 
+> **Note:** If this is the first time you run the project, you're probably missing the RHCOS ISO. (you'll get an error along these lines: `RHCOS ISO not found at path: rhcos-live-iso.x86_64.iso`).  
+> Running `make image` will fetch it.
+
+
 ### 6. Verify API is Running
 
 The migration-planner API should be running on `http://localhost:3443`. Verify it's working:
