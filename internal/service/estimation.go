@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,11 +19,13 @@ import (
 
 // MigrationComplexityResult holds the output of a complexity estimation run.
 type MigrationComplexityResult struct {
-	ComplexityByDisk   []complexity.DiskComplexityEntry // scores 1–4, always 4 entries
-	ComplexityByOS     []complexity.OSDifficultyEntry   // scores 0–4, always 5 entries
-	ComplexityByOSName []complexity.OSNameEntry         // one entry per distinct OS name
-	DiskSizeRatings    map[string]complexity.Score      // static tier label → score lookup
-	OSRatings          map[string]complexity.Score      // per-inventory OS name → score
+	ComplexityByDisk   []complexity.DiskComplexityEntry                           // scores 1–4, always 4 entries
+	ComplexityByOS     []complexity.OSDifficultyEntry                             // scores 0–4, always 5 entries
+	ComplexityByOSName []complexity.OSNameEntry                                   // one entry per distinct OS name
+	DiskSizeRatings    map[string]complexity.Score                                // static tier label → score lookup
+	OSRatings          map[string]complexity.Score                                // per-inventory OS name → score
+	ComplexityByOsDisk []complexity.OSDifficultyEntry                             // scores 0–4, always 5 entries; from DistributionByComplexity
+	ComplexityMatrix   map[complexity.Score]map[complexity.Score]complexity.Score // static combined-score lookup per-inventory OS name → score
 }
 
 // MigrationAssessmentResult represents the result of a migration assessment calculation
@@ -222,13 +225,35 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 		})
 	}
 
+	complexityByOsDisk := buildComplexityByOsDisk(clusterInventory.Vms.DistributionByComplexity)
+
 	return &MigrationComplexityResult{
 		ComplexityByOS:     complexity.OSBreakdown(osEntries),
 		ComplexityByOSName: complexity.OSNameBreakdown(osEntries),
 		ComplexityByDisk:   complexity.DiskBreakdown(diskEntries),
+		ComplexityByOsDisk: complexityByOsDisk,
+		ComplexityMatrix:   complexity.ComplexityMatrix,
 		DiskSizeRatings:    complexity.DiskSizeRangeRatings(),
 		OSRatings:          complexity.OSRatings(osEntries),
 	}, nil
+}
+
+// buildComplexityByOsDisk converts the sparse DistributionByComplexity map (string score → VM count)
+// into a []OSDifficultyEntry in canonical score order (0–4). Absent scores carry VMCount == 0.
+func buildComplexityByOsDisk(dist *map[string]int) []complexity.OSDifficultyEntry {
+	counts := make(map[complexity.Score]int)
+	if dist != nil {
+		for key, count := range *dist {
+			if score, err := strconv.Atoi(key); err == nil {
+				counts[score] += count
+			}
+		}
+	}
+	result := make([]complexity.OSDifficultyEntry, len(complexity.OSScores))
+	for i, s := range complexity.OSScores {
+		result[i] = complexity.OSDifficultyEntry{Score: s, VMCount: counts[s]}
+	}
+	return result
 }
 
 // mapClusterToParams converts cluster inventory data to estimation parameters

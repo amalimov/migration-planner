@@ -58,6 +58,9 @@ func normalizeInventoryData(data *api.InventoryData) {
 	if data.Vms.DistributionByNicCount == nil {
 		data.Vms.DistributionByNicCount = &map[string]int{}
 	}
+	if data.Vms.DistributionByComplexity == nil {
+		data.Vms.DistributionByComplexity = &map[string]int{}
+	}
 }
 
 func SourceToApi(s model.Source) (api.Source, error) {
@@ -350,10 +353,29 @@ func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) ap
 		}
 	}
 
+	byOsDisk := make([]api.ComplexityOSScoreEntry, len(result.ComplexityByOsDisk))
+	for i, entry := range result.ComplexityByOsDisk {
+		byOsDisk[i] = api.ComplexityOSScoreEntry{
+			Score:   entry.Score,
+			VmCount: entry.VMCount,
+		}
+	}
+
+	matrix := make(map[string]map[string]int, len(result.ComplexityMatrix))
+	for osScore, diskMap := range result.ComplexityMatrix {
+		inner := make(map[string]int, len(diskMap))
+		for diskScore, combined := range diskMap {
+			inner[fmt.Sprintf("%d", diskScore)] = combined
+		}
+		matrix[fmt.Sprintf("%d", osScore)] = inner
+	}
+
 	return api.MigrationComplexityResponse{
 		ComplexityByDisk:   byDisk,
 		ComplexityByOS:     byOS,
 		ComplexityByOSName: byOSName,
+		ComplexityByOsDisk: byOsDisk,
+		ComplexityMatrix:   matrix,
 		DiskSizeRatings:    result.DiskSizeRatings,
 		OsRatings:          result.OSRatings,
 	}

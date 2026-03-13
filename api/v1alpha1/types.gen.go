@@ -227,7 +227,7 @@ type ComplexityOSNameEntry struct {
 	// OsName The OS name exactly as it appears in vms.osInfo (e.g. "Red Hat Enterprise Linux 9 (64-bit)").
 	OsName string `json:"osName"`
 
-	// Score Complexity score assigned by ClassifyOS. 0 = unclassified, 1 = least complex, 4 = most complex.
+	// Score Complexity score assigned by ClassifyOS. 0 = unknown, 1 = least complex, 4 = most complex.
 	Score int `json:"score"`
 
 	// VmCount Number of VMs running this OS.
@@ -236,7 +236,7 @@ type ComplexityOSNameEntry struct {
 
 // ComplexityOSScoreEntry One entry in the OS complexity breakdown
 type ComplexityOSScoreEntry struct {
-	// Score Complexity score from 0 to 4, where 1 indicates the least complex OS to migrate and 0 indicates an OS that could not be classified.
+	// Score Complexity score from 0 to 4, where 1 indicates the least complex OS to migrate and 0 indicates an OS with unknown complexity.
 	Score int `json:"score"`
 
 	// VmCount Number of VMs at this complexity score
@@ -419,16 +419,22 @@ type MigrationComplexityResponse struct {
 	// ComplexityByDisk Disk-size complexity scores, one entry per score level (1-4). Score 1 is the least complex disk footprint; score 4 is the most complex. Scores correspond to provisioned disk size: 1 (<=10 TB), 2 (<=20 TB), 3 (<=50 TB), 4 (>50 TB). All four score levels are always present.
 	ComplexityByDisk []ComplexityDiskScoreEntry `json:"complexityByDisk"`
 
-	// ComplexityByOS OS complexity scores, one entry per score level (0-4). Score 1 indicates the least complex OS to migrate; score 0 indicates an OS that could not be classified. All five score levels are always present.
+	// ComplexityByOS OS complexity scores, one entry per score level (0-4). Score 1 indicates the least complex OS to migrate; score 0 indicates an OS with unknown complexity. All five score levels are always present.
 	ComplexityByOS []ComplexityOSScoreEntry `json:"complexityByOS"`
 
 	// ComplexityByOSName Per-OS-name complexity breakdown. One entry per distinct OS name found in the cluster's inventory. Each entry carries the OS name string, its numeric complexity score (0–4), and the number of VMs running it.
 	ComplexityByOSName []ComplexityOSNameEntry `json:"complexityByOSName"`
 
+	// ComplexityByOsDisk Combined OS+Disk complexity breakdown, one entry per score level (0–4). Score 0 indicates VMs with an unknown OS; score 4 indicates the highest complexity. All five score levels are always present. Values come from the pre-computed OsDiskComplexity column populated at ingestion time.
+	ComplexityByOsDisk []ComplexityOSScoreEntry `json:"complexityByOsDisk"`
+
+	// ComplexityMatrix Decision matrix used to derive the combined OS+Disk complexity score. Outer keys are OS complexity scores (0–4); inner keys are disk complexity scores (1–4); values are the resulting combined score. Use osRatings to resolve a VM's OS score and diskSizeRatings to resolve its disk score, then index this matrix to find the combined complexity.
+	ComplexityMatrix map[string]map[string]int `json:"complexityMatrix"`
+
 	// DiskSizeRatings Static lookup table mapping each disk-size tier label to its numeric complexity score. The content is identical for every cluster and reflects the DiskSizeScores configuration in the complexity package.
 	DiskSizeRatings map[string]int `json:"diskSizeRatings"`
 
-	// OsRatings Per-OS-name score for every OS found in this cluster's inventory. Keys are the OS name strings exactly as they appear in vms.osInfo; values are the numeric complexity score assigned by ClassifyOS (0 = unclassified, 1-4 = increasing complexity). The map contains one entry per distinct OS name in the cluster, regardless of how many VMs run it.
+	// OsRatings Per-OS-name score for every OS found in this cluster's inventory. Keys are the OS name strings exactly as they appear in vms.osInfo; values are the numeric complexity score assigned by ClassifyOS (0 = unknown, 1-4 = increasing complexity). The map contains one entry per distinct OS name in the cluster, regardless of how many VMs run it.
 	OsRatings map[string]int `json:"osRatings"`
 }
 

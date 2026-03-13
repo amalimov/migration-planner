@@ -1882,7 +1882,7 @@ components:
           description: >
             OS complexity scores, one entry per score level (0-4).
             Score 1 indicates the least complex OS to migrate; score 0 indicates an
-            OS that could not be classified. All five score levels are always present.
+            OS with unknown complexity. All five score levels are always present.
           items:
             $ref: "#/components/schemas/ComplexityOSScoreEntry"
         diskSizeRatings:
@@ -1898,7 +1898,7 @@ components:
           description: >
             Per-OS-name score for every OS found in this cluster's inventory. Keys are the
             OS name strings exactly as they appear in vms.osInfo; values are the numeric
-            complexity score assigned by ClassifyOS (0 = unclassified, 1-4 = increasing
+            complexity score assigned by ClassifyOS (0 = unknown, 1-4 = increasing
             complexity). The map contains one entry per distinct OS name in the cluster,
             regardless of how many VMs run it.
           additionalProperties:
@@ -1911,12 +1911,35 @@ components:
             complexity score (0–4), and the number of VMs running it.
           items:
             $ref: "#/components/schemas/ComplexityOSNameEntry"
+        complexityByOsDisk:
+          type: array
+          description: >
+            Combined OS+Disk complexity breakdown, one entry per score level (0–4).
+            Score 0 indicates VMs with an unknown OS; score 4 indicates the highest complexity.
+            All five score levels are always present. Values come from the pre-computed
+            OsDiskComplexity column populated at ingestion time.
+          items:
+            $ref: "#/components/schemas/ComplexityOSScoreEntry"
+        complexityMatrix:
+          type: object
+          description: >
+            Decision matrix used to derive the combined OS+Disk complexity score.
+            Outer keys are OS complexity scores (0–4); inner keys are disk complexity
+            scores (1–4); values are the resulting combined score. Use osRatings to
+            resolve a VM's OS score and diskSizeRatings to resolve its disk score, then
+            index this matrix to find the combined complexity.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: integer
       required:
         - complexityByDisk
         - complexityByOS
         - diskSizeRatings
         - osRatings
         - complexityByOSName
+        - complexityByOsDisk
+        - complexityMatrix
 
     ComplexityDiskScoreEntry:
       type: object
@@ -1948,7 +1971,7 @@ components:
           type: integer
           description: >
             Complexity score from 0 to 4, where 1 indicates the least complex OS
-            to migrate and 0 indicates an OS that could not be classified.
+            to migrate and 0 indicates an OS with unknown complexity.
         vmCount:
           type: integer
           description: Number of VMs at this complexity score
@@ -1968,7 +1991,7 @@ components:
         score:
           type: integer
           description: >
-            Complexity score assigned by ClassifyOS. 0 = unclassified, 1 = least
+            Complexity score assigned by ClassifyOS. 0 = unknown, 1 = least
             complex, 4 = most complex.
         vmCount:
           type: integer
